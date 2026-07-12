@@ -1,0 +1,3 @@
+{
+  "playwright.configFile": "${workspaceFolder}/playwright.config.ts"
+}
