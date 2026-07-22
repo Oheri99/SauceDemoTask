@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { LoginPage, ProductsPage, CartPage, CheckoutPage } from '../e2e/pages';
+import { LoginPage, ProductsPage, CartPage, CheckoutPage } from '../src/pages';
 
 
 test.describe('SauceDemo - End-to-End Tests', () => {
