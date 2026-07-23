@@ -7,6 +7,9 @@ node_modules/
 /playwright/.cache/
 /playwright/.auth/
 
+# NOTE: __screenshots__ should be committed to git for visual regression testing
+# It contains baseline snapshots for comparison
+
 # Environment variables
 .env
 .env.local

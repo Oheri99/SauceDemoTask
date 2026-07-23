@@ -4,7 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:visual": "playwright test --project=chromium",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:screenshots": "playwright test tests/screenShot.spec.ts --project=chromium",
+    "test:screenshots:update": "playwright test tests/screenShot.spec.ts --update-snapshots",
+    "report": "playwright show-report"
   },
   "keywords": [],
   "author": "",
