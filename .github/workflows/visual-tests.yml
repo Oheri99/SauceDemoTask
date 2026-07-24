@@ -2,91 +2,116 @@ name: Visual Regression Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches:
+      - main
+      - develop
+
   pull_request:
-    branches: [ main, develop ]
+    branches:
+      - main
+      - develop
 
 jobs:
   visual-tests:
-    timeout-minutes: 60
+    name: Visual Regression (Chromium)
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+
     env:
+      BASE_URL: https://www.saucedemo.com
       STANDARD_USERNAME: ${{ secrets.STANDARD_USERNAME }}
       PASSWORD: ${{ secrets.PASSWORD }}
-    
-    strategy:
-      fail-fast: false
-      matrix:
-        browser: [chromium, firefox, webkit]
-    
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Node.js
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-      
+          node-version: 20
+          cache: npm
+
       - name: Install dependencies
         run: npm ci
-      
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-      
-      - name: Run visual tests (${{ matrix.browser }})
-        run: npm run test:screenshots -- --project=${{ matrix.browser }}
-        continue-on-error: true
-      
-      - name: Upload test results
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run visual regression tests
+        run: npx playwright test tests/screenShot.spec.ts --project=chromium
+
+      - name: Upload Playwright HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ matrix.browser }}
-          path: playwright-report/
-          retention-days: 30
-      
-      - name: Upload screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshots-${{ matrix.browser }}
-          path: tests/__screenshots__/
+          name: playwright-report
+          path: playwright-report
           retention-days: 30
 
-  visual-tests-results:
+      - name: Upload test results (actual/expected/diff)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results
+          retention-days: 30
+
+      - name: Upload visual snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-snapshots
+          path: |
+            tests/**/*-snapshots/**
+            tests/__screenshots__/**
+          if-no-files-found: ignore
+          retention-days: 30
+
+  publish-results:
     name: Publish Test Results
     needs: visual-tests
     runs-on: ubuntu-latest
     if: always()
-    
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      
+
       - name: Comment PR with results
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const artifacts = fs.readdirSync('./artifacts');
-            const browsers = [...new Set(artifacts.map(a => a.split('-').pop()))];
-            
-            let comment = '## 📸 Visual Regression Tests\n\n';
-            comment += `✅ Tests completed for: ${browsers.join(', ')}\n\n`;
-            comment += '**Artifacts:**\n';
-            artifacts.forEach(artifact => {
-              comment += `- ${artifact}\n`;
-            });
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
+
+            const artifacts = fs.existsSync('./artifacts')
+              ? fs.readdirSync('./artifacts')
+              : [];
+
+            const reportFound = artifacts.includes('playwright-report');
+            const resultsFound = artifacts.includes('test-results');
+
+            const body = `
+            ## 📸 Playwright Visual Regression
+
+            **Browser:** Chromium
+
+            **Artifacts Uploaded**
+            - HTML Report: ${reportFound ? '✅' : '❌'}
+            - Test Results (diff images): ${resultsFound ? '✅' : '❌'}
+
+            Download the artifacts from this workflow to inspect:
+            - HTML report
+            - Expected screenshots
+            - Actual screenshots
+            - Diff screenshots
+            `;
+
+            await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: comment
+              issue_number: context.issue.number,
+              body
             });
