@@ -1,54 +1,161 @@
-import { Page } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 import { BasePage } from './BasePage';
 
 export class ProductsPage extends BasePage {
-  readonly productsContainer = '.inventory_list';
-  readonly productItem = '.inventory_item';
-  readonly cartButton = '[data-test="shopping-cart-link"]';
-  readonly cartBadge = '.shopping_cart_badge';
-  readonly sortDropdown = '[data-test="product-sort-container"]';
+
+  readonly productsContainer: Locator;
+  readonly productItems: Locator;
+  readonly cartButton: Locator;
+  readonly cartBadge: Locator;
+  readonly sortDropdown: Locator;
+  readonly productImages: Locator;
 
   constructor(page: Page) {
     super(page);
+
+    this.productsContainer = page.locator('.inventory_list');
+    this.productItems = page.locator('.inventory_item');
+    this.cartButton = page.locator('[data-test="shopping-cart-link"]');
+    this.cartBadge = page.locator('.shopping_cart_badge');
+    this.sortDropdown = page.locator('[data-test="product-sort-container"]');
+    this.productImages = page.locator('.inventory_item_img');
   }
 
-  async addProductToCart(productName: string) {
-    const addButton = `//button[@data-test="add-to-cart-${this.formatProductName(productName)}"]`;
-    await this.page.click(addButton);
+
+  async waitForPageLoaded(): Promise<void> {
+
+    await expect(
+      this.productsContainer
+    ).toBeVisible();
+
+
+    await this.page.waitForFunction(() => {
+
+      const images = Array.from(
+        document.querySelectorAll('img')
+      );
+
+      return images.every(
+        img => img.complete && img.naturalHeight > 0
+      );
+
+    });
+
   }
 
-  async removeProductFromCart(productName: string) {
-    const removeButton = `//button[@data-test="remove-${this.formatProductName(productName)}"]`;
-    await this.page.click(removeButton);
+
+  async addProductToCart(productName: string): Promise<void> {
+
+    const addButton = this.page.locator(
+      `[data-test="add-to-cart-${this.formatProductName(productName)}"]`
+    );
+
+    await expect(addButton).toBeVisible();
+
+    await addButton.click();
+
   }
 
-  async getProductPrice(productName: string): Promise<string | null> {
-    const priceSelector = `//div[contains(text(), "${productName}")]/ancestor::div[@class="inventory_item"]//div[@class="inventory_item_price"]`;
-    return await this.getText(priceSelector);
+
+  async removeProductFromCart(productName: string): Promise<void> {
+
+    const removeButton = this.page.locator(
+      `[data-test="remove-${this.formatProductName(productName)}"]`
+    );
+
+    await expect(removeButton).toBeVisible();
+
+    await removeButton.click();
+
   }
+
+
+  async getProductPrice(
+    productName: string
+  ): Promise<string | null> {
+
+    const product = this.page.locator('.inventory_item')
+      .filter({
+        hasText: productName,
+      });
+
+
+    return await product
+      .locator('.inventory_item_price')
+      .textContent();
+
+  }
+
 
   async getProductCount(): Promise<number> {
-    const items = await this.page.locator(this.productItem).count();
-    return items;
+
+    return await this.productItems.count();
+
   }
+
 
   async getCartCount(): Promise<string | null> {
-    return await this.getText(this.cartBadge);
+
+    if (
+      await this.cartBadge.isVisible()
+    ) {
+      return await this.cartBadge.textContent();
+    }
+
+    return null;
+
   }
 
-  async goToCart() {
-    await this.click(this.cartButton);
+
+  async goToCart(): Promise<void> {
+
+    await this.cartButton.click();
+
   }
 
-  async sortProducts(sortOption: string) {
-    await this.click(this.sortDropdown);
-    await this.page.selectOption(this.sortDropdown, sortOption);
+
+  async sortProducts(
+    sortOption: string
+  ): Promise<void> {
+
+    await this.sortDropdown.selectOption(sortOption);
+
   }
 
-  private formatProductName(productName: string): string {
+
+  async getProductNames(): Promise<string[]> {
+
+    return await this.page
+      .locator('.inventory_item_name')
+      .allTextContents();
+
+  }
+
+
+  async takeVisualSnapshot(
+    name: string
+  ): Promise<void> {
+
+    await this.waitForPageLoaded();
+
+    await expect(this.page)
+      .toHaveScreenshot(name, {
+        animations: 'disabled',
+        caret: 'hide',
+      });
+
+  }
+
+
+  private formatProductName(
+    productName: string
+  ): string {
+
     return productName
       .toLowerCase()
       .replace(/\s+/g, '-')
       .replace(/[^\w-]/g, '');
+
   }
+
 }
