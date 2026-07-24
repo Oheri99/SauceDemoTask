@@ -117,3 +117,28 @@ tests/
 - [Playwright Visual Comparisons](https://playwright.dev/docs/test-snapshots)
 - [Playwright Configuration](https://playwright.dev/docs/test-configuration)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
+
+## Sauce Demo (project-specific)
+
+This repo's visual tests target the Sauce Demo site. The tests capture the login page and the products inventory page across responsive viewports.
+
+- Environment variables (optional — defaults provided):
+  - `STANDARD_USERNAME` — default `standard_user`
+  - `PASSWORD` — default `secret_sauce`
+
+- Run the Sauce Demo visual tests locally:
+
+```bash
+# install deps
+npm ci
+npx playwright install --with-deps
+
+# run visual screenshots (chromium)
+npm run test:screenshots
+
+# update snapshots after intentional UI changes
+npm run test:screenshots:update
+```
+
+- Notes:
+  - CI will need the credentials set as secrets (`STANDARD_USERNAME`, `PASSWORD`) if you don't want to use the public defaults.

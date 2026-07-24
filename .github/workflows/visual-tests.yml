@@ -10,6 +10,9 @@ jobs:
   visual-tests:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    env:
+      STANDARD_USERNAME: ${{ secrets.STANDARD_USERNAME }}
+      PASSWORD: ${{ secrets.PASSWORD }}
     
     strategy:
       fail-fast: false
