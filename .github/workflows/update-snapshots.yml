@@ -2,54 +2,89 @@ name: Update Visual Snapshots
 
 on:
   issue_comment:
-    types: [created, edited]
+    types:
+      - created
 
 jobs:
   update-snapshots:
-    runs-on: ubuntu-latest
-    if: |
+    if: >
       github.event.issue.pull_request &&
       github.event.comment.body == '/update-snapshots'
-    
+
+    runs-on: ubuntu-latest
+
     permissions:
       contents: write
       pull-requests: write
-    
+
+    env:
+      BASE_URL: https://www.saucedemo.com
+      STANDARD_USERNAME: ${{ secrets.STANDARD_USERNAME }}
+      PASSWORD: ${{ secrets.PASSWORD }}
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Get PR information
+        id: pr
+        uses: actions/github-script@v7
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            core.setOutput('ref', pull.head.ref);
+            core.setOutput('repo', pull.head.repo.full_name);
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pr.outputs.repo }}
+          ref: ${{ steps.pr.outputs.ref }}
           fetch-depth: 0
-      
-      - name: Install Node.js
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-      
+          node-version: 20
+          cache: npm
+
       - name: Install dependencies
         run: npm ci
-      
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-      
-      - name: Update visual snapshots
-        run: npm run test:screenshots:update
-      
-      - name: Commit and push updated snapshots
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Update snapshots
+        run: |
+          npx playwright test tests/screenShot.spec.ts \
+            --project=chromium \
+            --update-snapshots
+
+      - name: Commit updated snapshots
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add tests/__screenshots__/
-          git diff --cached --quiet || (git commit -m "Update visual snapshots" && git push)
-      
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add tests/**/*-snapshots
+          git add tests/__screenshots__ || true
+
+          if git diff --cached --quiet; then
+            echo "No snapshot changes."
+          else
+            git commit -m "chore: update Playwright visual snapshots"
+            git push
+          fi
+
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
+            await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '✅ Visual snapshots updated and committed!'
+              issue_number: context.issue.number,
+              body: "✅ Playwright visual snapshots have been updated and committed."
             });
